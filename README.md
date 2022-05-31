@@ -1,4 +1,4 @@
-# Paper-AFEX-NPP
+# Paper-AFEX-NPP-Cunha
 
 ## Direct evidence for phosphorus limitation on Amazon forest productivity
 
