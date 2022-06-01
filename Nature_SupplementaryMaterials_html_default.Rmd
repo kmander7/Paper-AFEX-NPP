@@ -1,0 +1,1032 @@
+---
+title: "Supplementary material"
+subtitle: "Statistical Analysis and Methods"
+author: "Cunha et al."
+date: "2022/05/31"
+output:
+  html_document:
+    code_folding: hide
+    toc: yes
+    toc_depth: 3
+    toc_float: no
+    df_print: kable 
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+options(tinytex.verbose = TRUE)
+options(scipen=999)         # Remove scientific notation
+devtools::install_github("haozhu233/kableExtra")
+library(rmarkdown)
+library(tinytex)
+library(tidyverse) # lazy load tidy packages
+library(ggplot2) #to make graphics
+library (GGally) # graphics for ggplot2
+library(RColorBrewer) # fig colors
+library(ggpubr) # ggplot extensions
+library(ggtext)# ggplot extensions
+library(ggsci)# ggplot extensions
+library(gridExtra) # organise fig panels
+library(multcomp) #lmm dunnet/tukey
+library(nlme) #lmm
+library(lmerTest)  #lmm value p
+library(emmeans)  #lmm
+library(LMERConvenienceFunctions)#lmm #mcp.fnc
+library(Matrix) #lme4 dependent
+library(lme4) #lmm
+library(cAIC4) #AIC and stepAIC
+library(MuMIn)
+library(MASS) #lmm anova/AIC
+library(multcompView) #lmm dunnet/tukey
+library(performance)
+library(formatR)
+library(patchwork)
+library(kableExtra)
+library(qwraps2) #for ci
+#library(stargazer)
+#library(sjPlot) #pretty lmer tables
+#library(sandwich)
+#library(gmodels) #ci
+#global functions
+sem <- function(x, na.rm = FALSE) {
+  out <-sd(x, na.rm = na.rm)/sqrt(length(x))
+  return(out)
+}
+se<-function(x) sd(x,na.rm=TRUE)/sqrt(length(x))
+```
+
+
+# Supplementary information
+
+
+All supplementary files for the below paper are available at: https://github.com/kmander7/Paper-AFEX-NPP
+
+
+Supplementary data for the following paper:
+
+Cunha, H.F.V., K.M. Andersen, L.F. Lugli, F.D. Santana, I. Aleixo, A.M. Moraes, S. Garcia, R. Di Ponzio, E.M. Oblitas, B. Brum, J.R. Schmeisk, A.L. Cordeiro, B.T.P. Takeshi, G. Ribeiro, S.C. Deambrozi, S. Trierveiler de Souza, L. Siebert Silva, F. Antonieto, M. Pires, A.C. Salomão, A.C. Miron, R.L. Assis, T.F. Domingues, L.E.O.C. Aragão, P. Meir, J.L. Camargo, A. Manzi, L. Nagy, L.M. Mercado, I.P. Hartley and C.A. Quesada. [Date] Direct evidence for phosphorus limitation on Amazon forest productivity. Submitted. Nature.
+
+
+
+
+$~$
+
+#### Pre-treatment forest stand structure
+
+We have evidence from the beginning of the experiment for similar stand structures in the plots both for leaf area index and wood biomass. In the control plot (n=4) wood biomass was 357.7 ± 68 Mg ha^-1^. No significant differences were detected for any of the treatments (*n*=16) in May 2017 (N: *F*~1~ ~,~ ~25~ = 0.738, *p* = 0.40; P: *F*~1~ ~,~ ~25~ = 0.246, *p* = 0.25; CATIONS: *F*~1~ ~,~ ~25~ = 0.09, *p* = 0.76). Wood biomass was obtained by summing the wood biomass of all trees > 10 cm DBH present in the plot (50 x 50 m) and converted to 1 ha.
+
+
+$~$
+
+
+#### Linear mixed model approach
+
+Here we present linear mixed models for each of the response variables discussed in the main text of the manuscript. All full models follow the same general formula:
+
+*lmer*(response ~ N * P * CATIONS + (1|Block))
+
+Final models were determined by step-wise backward elimination of the fixed effects using the *step*() function in the R package 'lmerTest'. 
+
+We also compare final models to null models for completeness.
+
+$~$
+
+
+##  1. Total net primary productivity (NPP)
+
+
+
+```{r load data, include=FALSE}
+## Load data
+total<-read_csv("TOTAL.csv")
+#View(total)
+total <- total %>%
+  rename("Litterfall_Productivity"= "Produt_lit_anual_carbon",
+         "Wood_Productivity"="Mg_C_ha_ano",
+         "Fine_root_Productivity"="ton_ha_ano_0_30",
+         "Fine_root_Productivity_0_10"="ton_ha_ano_0_10",
+         "Fine_root_Productivity_10_30"="ton_ha_ano_10_20") %>%
+  mutate("Total_Productivity" = Litterfall_Productivity +
+           Wood_Productivity + Fine_root_Productivity)
+#total
+
+## Now add in experimental design
+int<-read_csv("AFEX2.0_Treatments.csv")
+
+total <-left_join(total,int)## add experimental design to dataframe
+
+# recode multiple variables as factors
+cols <- c("PlotID","Block","TRT","P","N","CATIONS","Plot") 
+NPP <- total %>%
+  rename("N"="N")%>%
+  mutate(across(all_of(cols),factor)) %>%# updated version 20210708
+  mutate(Phosphorus = fct_recode(P, "-P" = "0", "+P" = "1"), 
+         Cations = fct_recode(CATIONS, "-Cations" = "0", "+Cations"= "1"),
+         Nrogen = fct_recode(N,"-N"="0", "+N"="1"))
+```
+
+
+
+
+### 1.1 Total productivity summary table
+
+
+```{r Table_S1}
+totprd_mnse_trt <- NPP %>%
+  dplyr::select(TRTNUM, TRT,Total_Productivity) %>%
+  mutate(TRT = fct_reorder(TRT,TRTNUM)) %>%
+  dplyr::group_by(TRT) %>%
+  summarise(across(Total_Productivity, 
+                   .f = list(n = ~length(.x),mean = ~round(mean(.x, na.rm=TRUE),digits =2),
+                                             sd=~round(sd(.x),digits = 3), 
+                                             se = ~round(sem(.x), digits = 3)))%>%
+  rename("N"=Total_Productivity_n, "Mean total \nproductivity" = Total_Productivity_mean, 
+         "sd" = Total_Productivity_sd,
+         "se" = Total_Productivity_se)) 
+  
+  
+TableS1 <- kbl(totprd_mnse_trt, booktabs = T, caption = "**Supplementary Table S1 | Summary of total productivity.** Mean total productivity (Mg C ha^-1^ yr^-1^), standard deviation, and standard error in different fertilisation treatments in a mature forest in Central Amazonia. The data analysis comprises two years (2017 to 2019).")
+kable_classic(TableS1,lightable_options = "basic")
+
+```
+
+$~$
+
+### 1.2 Total productivity model selection
+
+```{r run totmod_full ,tidy=TRUE, warning = FALSE ,fig.height=12}
+totmod <- lmer(Total_Productivity ~ N * P * CATIONS + (1|Block), data=NPP, 
+               na.action = na.fail)
+totmod_check <- check_model(totmod)
+#anova(totmod)
+
+#model simplification
+totmodsimp <- step(totmod, reduce.random = FALSE, trace =TRUE) #from lmertest package, now keeps random factor in backward selection process
+#totmodsimp # only P remains in model
+finmod <- get_model(totmodsimp)
+finmod_check <- check_model(finmod)
+#finmod_check
+
+#null model
+nulltotmod <- lmer(Total_Productivity ~ 1 + (1|Block), data=NPP, na.action = na.fail)
+#summary(nulltotmod)
+null_check <- anova(finmod,nulltotmod)
+
+
+# Print model tables
+#totmodsimp <- anova(totmodsimp)
+TableS2 <- kbl(totmodsimp$fixed, booktabs = T, caption = "**Supplementary Table S2 | Model simplification for total productivity.**  Model output from the step-wise backward elimination process of the 'lmerTest' *step*() function, with fixed factors listed in order of elimination based on the hierarchical levels of the model. Model 0 indicates the final model, which included the fixed effect of P addition.")
+kable_classic(TableS2,lightable_options = "basic")
+
+```
+
+
+
+
+$~$
+
+```{r finmod ,results = 'asis'}
+#print final model
+finmod <- anova(finmod)
+
+TableS3 <- kbl(finmod, booktabs = T, caption = "**Supplementary Table S3 | Final model for total productivity.** The final model for total productivity includes a significant effect of P addition: *lmer*(Total_productivity ~ P + (1|Block).  Results are reported in the graphs for the best fit model.")
+kable_classic(TableS3,lightable_options = "basic")
+
+
+
+```
+
+
+
+```{r,results = 'asis'}
+#print null model - 
+TableS4 <- kbl(null_check, booktabs = T, caption = "**Supplementary Table S4 | Null model comparison for Total productivity.** For completeness, we also compare the null model *lmer*(Total_productivity ~ 1 + (1|Block)  to final model containing P as a significant fixed effect. As the step-wise procedure showed, the final model was a better fit for the data than the null model.")
+kable_classic(TableS4,lightable_options = "basic")
+
+```
+\newpage
+
+
+$~$
+
+
+
+
+
+
+## 2. Canopy parameters
+
+
+### 2.1 Litterfall productivity 
+
+
+**Litterfall productivity (Moraes et al., unpublished data)**
+
+
+**Step by step methodology for litterfall production estimates **
+
+1. Transform the data to g produced per day per m^-2^. We used the collection period +/- 15 days to get daily inputs, and the area of the litter trap is 0.5 x 0.5 m.
+
+2. Transform the data in g day m^-2^ to Mg ha^-1^ year^-1^. We used a conversion factor of 3.65 to convert to Mg ha^-1^ year^-1^
+
+    Mg/ (ha*year)
+
+    (10.000* 365)/ 10^6^, where 1 ha= 10.000 m^2^; 1 year= 365 days; 1 Mg = 1000000 g.
+
+3. The first mean was made by considering the five litter-traps inside the plot. From 160 collection (5 litter-traps in each plot x 32) were transformed to only 32.
+
+4. Total litterfall productivity was the sum of leaves + wood + reproductive + frass + other components in Mg ha^-1^ year^-1^
+
+5. In January 2018, and January and February 2019, only one collection was made, rather than the twice a month during all other months. Thus, the mean total canopy productivity, was based on 45 censuses, and was transformed to a single value representing the mean productivity over two years.
+
+6. To transform the biomass production to carbon production, we divided by 2, where the carbon in the litterfall represents 50% of the biomass.
+
+
+
+
+$~$
+
+
+
+#### 2.1.1 Litterfall productivity summary table
+
+
+```{r Table S5}
+litprd_mnse_trt <- NPP %>%
+  dplyr::select(TRTNUM, TRT,Litterfall_Productivity) %>%
+  mutate(TRT = fct_reorder(TRT,TRTNUM)) %>%
+  dplyr::group_by(TRT) %>%
+  summarise(across(Litterfall_Productivity, 
+                   .f = list(n = ~length(.x),
+                             mean = ~round(mean(.x, na.rm=TRUE),digits =2),
+                             sd=~round(sd(.x),digits = 3), 
+                             se = ~round(sem(.x), digits = 3)))) %>%
+  rename("N"=Litterfall_Productivity_n, "Mean liiterfall \nproductivity" =
+           Litterfall_Productivity_mean, 
+         "sd" = Litterfall_Productivity_sd,
+         "se" = Litterfall_Productivity_se)
+  
+  
+TableS5 <- kbl(litprd_mnse_trt, booktabs = T, caption = "**Supplementary Table S5 | Summary of litterfall productivity.** Mean litterfall productivity (Mg C ha^-1^ yr^-1^), standard deviation, and standard error for each of the 8 treatments in a mature forest in Central Amazonia. The data analysis comprises two years (2017 to 2019).")
+kable_classic(TableS5,lightable_options = "basic")
+
+```
+
+$~$
+
+####  2.1.2 Litterfall productivity model selection
+
+ 
+```{r litmod ,tidy=TRUE, warning = FALSE, fig.height=12}
+# Litterfall productivity full model
+littermod <- lmer(Litterfall_Productivity ~ N * P * CATIONS + (1|Block), 
+                  data=NPP, na.action = na.fail)
+#anova(littermod)
+#check_model(littermod)
+
+# Litterfall productivity model simplification
+litmodsimp <- step(littermod, reduce.random = FALSE) #from lmertest package, now keeps random factor in backward selection process
+#litmodsimp # only P remains in model
+litmodfinal <- get_model(litmodsimp)
+#check_model(litmodfinal)
+
+# Litterfall productivity null model 
+littermod_null <- lmer(Litterfall_Productivity ~ 1 + (1|Block), 
+                       data=NPP, na.action = na.fail)
+litnullcompare <- anova(litmodfinal,littermod_null)
+
+
+TableS6 <- kbl(litmodsimp$fixed, booktabs = T,caption = "**Supplementary Table S6 | Model simplification for litterfall productivity.** Backward elimination model selection table. The final model includes only the P addition fixed effect.")
+kable_classic(TableS6,lightable_options = "basic")
+
+```
+$~$
+
+
+
+
+```{r Table S7}
+litmodfinal <- anova(litmodfinal)
+TableS7 <- kbl(litmodfinal, booktabs = T, caption = "**Supplementary Table S7 | Final model for litterfall productivity.** Litterfall productivity final model shows a significant effect of P addition as reported in (Fig. 2B).")
+kable_classic(TableS7,lightable_options = "basic")
+
+```
+$~$
+
+
+
+```{r Table S8}
+TableS8 <- kbl(litnullcompare, booktabs = T, caption = "**Supplementary Table S8 | Null model comparison for  litterfall productivity.**For completeness, we compare the final model with the null model. However, as the output from the model selection indicates, the model including P is a better fit for the data than the null model.")
+kable_classic(TableS8,lightable_options = "basic")
+
+```
+\newpage
+
+
+
+$~$
+
+
+
+$~$
+
+
+
+### 2.2 Leaf area index (LAI)
+
+
+
+#### 2.2.1 LAI summary table
+
+```{r LAI_data_wrangle}
+lai<-read_csv("LAI/Censo_LAI20191127_final.csv")
+
+## Now add in experimental design
+int<-read_csv("AFEX2.0_Treatments.csv")
+
+lai <-left_join(lai,int)## add experimental design to dataframe
+
+# recode multiple variables as factors
+cols <- c("PlotID","Block","TRT","P","N","CATIONS","Plot") 
+
+LAI <- lai %>%
+  rename("N"="N")%>%
+  mutate(across(all_of(cols),factor)) %>%# updated version 20210708
+  mutate(Phosphorus = fct_recode(P, "-P" = "0", "+P" = "1"), 
+         Cations = fct_recode(CATIONS, "-Cations" = "0", "+Cations"= "1"),
+         Nitrogen = fct_recode(N,"-N"="0", "+N"="1"))
+
+# Remove values from outer edge of plots
+LAI_central<-LAI %>%
+  dplyr::filter(!(coord.x =="0"|coord.x =="50"|coord.y =="50"|coord.y == "0")) %>%
+  arrange(CENSO)
+#View(LAI_central) #2041 entries
+
+# plot means for each census
+Lai16<-LAI_central%>% 
+  drop_na(LAI_4_rings) %>%
+  group_by(CENSO,PlotID,Date,TRTNUM,TRT,N,P,CATIONS,Block,Plot) %>% 
+  summarise(mean=mean(LAI_4_rings)) 
+#View(Lai16) #128 entries
+
+# plot means over all censuses. dataframe used for lmer models
+Lai_plotmn<-Lai16%>% 
+  ungroup() %>%
+  group_by(TRTNUM,PlotID,TRT,N,P,CATIONS,Block,Plot) %>% 
+  arrange(TRTNUM) %>%
+  summarise(mean=mean(mean)) 
+  
+#write_csv(Lai_plotmn,"LAI/Lai_plotmn.csv")
+  
+#str(Lai_plotmn)
+#View(Lai_plotmn)
+
+LAI_mnse_trt <- Lai_plotmn %>%
+  dplyr::select(TRTNUM, TRT,mean) %>%
+  mutate(TRT = fct_reorder(TRT,TRTNUM)) %>%
+  dplyr::group_by(TRT) %>%
+  summarise(across(mean, .f = list(n = ~length(.x),
+                                   mean = ~round(mean(.x, na.rm=TRUE),digits =2),
+                                   sd=~round(sd(.x),digits = 3), 
+                                   se = ~round(sem(.x), digits = 3)))) %>%
+  rename("N"=mean_n, "Mean LAI" = mean_mean, "sd" = mean_sd,
+         "se" = mean_se)
+  
+TableSlai <- kbl(LAI_mnse_trt, booktabs = T, caption = "**Supplementary Table S9 | Leaf area index summary table.** Mean LAI, standard deviation (sd), and standard error (se) for each treatment based on plot mean values over four campaigns. ")
+kable_classic(TableSlai,lightable_options = "basic")
+
+```
+
+$~$
+
+
+
+####  2.2.2 LAI model selection
+
+
+
+```{r laimod , warning = FALSE, fig.height=12}
+#Lai_plotmn2 <- read_csv("LAI/Lai_plotmn.csv")
+Lai_plotmn2 <- as.data.frame(Lai_plotmn)
+#str(Lai_plotmn2)
+cols <- c("PlotID","Block","TRT","P","N","CATIONS","Plot") 
+Lai_plotmn2 <- Lai_plotmn2 %>%
+  mutate(across(all_of(cols),factor)) %>%
+  ungroup()
+
+# LAI full model
+lairmod <- lmer(mean ~ N * P * CATIONS + (1|Block), data=Lai_plotmn2, na.action = na.fail)
+#anova(lairmod)
+#check_model(lairmod)
+
+# LAI model simplification
+laimodsimp <- step(lairmod, reduce.random = FALSE) #from lmertest package, now keeps random factor in backward selection process
+#laimodsimp # all interactions and main effects dropped from model
+laimodfinal <- get_model(laimodsimp)
+#check_model(litmodfinal)
+
+
+#show full model
+TableS6 <- kbl(laimodsimp$fixed, booktabs = T, caption = "**Supplementary Table S10 | Model simplification for LAI.** Backward elimination model selection table. There were no significant effects for any interactions or main effects.")
+kable_classic(TableS6,lightable_options = "basic")
+```
+
+
+
+
+
+```{r lainullmod}
+
+# LAI null model 
+laimod_null <- lmer(mean ~ 1 + (1|Block), data=Lai_plotmn2, na.action = na.fail)
+lainullcompare <- anova(lairmod,laimod_null)
+#check_model(laimod_null)
+
+TableS6 <- kbl(lainullcompare, booktabs = T, caption = "**Supplementary Table S11 | Null model comparison for LAI.** For completeness, we compare the full model with the null model. However, there were no differences detected between the full and null models.")
+kable_classic(TableS6,lightable_options = "basic")
+
+```
+
+$~$
+
+
+
+
+$~$
+
+
+
+\newpage
+
+$~$
+
+
+
+
+$~$
+
+
+
+
+### 2.3 Leaf residence time (LRT) 
+```{r load lrt data, include =FALSE}
+lrt<-read_csv("LAI/Leaf residence time.csv")
+
+## Now add in experimental design
+int<-read_csv("AFEX2.0_Treatments.csv")
+
+lrt <-left_join(lrt,int)## add experimental design to dataframe
+
+# recode multiple variables as factors
+cols <- c("PlotID","Block","TRT","P","N","CATIONS","Plot") 
+
+LRT <- lrt %>%
+  rename("N"="N")%>%
+  mutate(across(all_of(cols),factor)) %>%# updated version 20210708
+  mutate(Phosphorus = fct_recode(P, "-P" = "0", "+P" = "1"), 
+         Cations = fct_recode(CATIONS, "-Cations" = "0", "+Cations"= "1"),
+         Nitrogen = fct_recode(N,"-N"="0", "+N"="1"))
+
+# leaf biomass = LAI/SLA
+# residence time = leaf biomass/productivity
+LRT <- LRT %>%
+  mutate(leaf_biomass_g.m2= LAI_4_campaigns/SLA_m2.g, # SLA based on fresh canopy leaves to convert to biomass
+         leaf_biomass_t.ha = leaf_biomass_g.m2*0.01, #convert g/m2 to t/ha
+         leaf_residence_time_y = leaf_biomass_t.ha/Leaf_productivity_24_collections,
+         SLA_m2.g_litter = 1/LMA_g.m2, # SLA based on litter LMA values
+         leaf_biomass_g.m2_litter = LAI_4_campaigns/SLA_m2.g_litter, 
+         # leaf biomass based on litter_SLA
+         leaf_biomass_t.ha_litter = leaf_biomass_g.m2_litter*0.01, ## uN conversion
+         leaf_residence_time_litter = leaf_biomass_t.ha_litter / 
+        Leaf_productivity_24_collections ) # LRT_litter
+
+#View(LRT)
+
+
+```
+
+
+
+$~$
+
+
+#### 2.3.1 Leaf residence time summary tables
+
+$~$
+
+##### 2.3.1.1 LRT estimates based on fresh leaf SLA. 
+```{r Table_lrt1}
+lrtfresh_mnse_trt <- LRT %>%
+  dplyr::select(TRTNUM, TRT,leaf_residence_time_y) %>%
+  mutate(TRT = fct_reorder(TRT,TRTNUM)) %>%
+  dplyr::group_by(TRT) %>%
+  summarise(across(leaf_residence_time_y, 
+                   .f = list(n = ~length(.x),
+                             mean = ~round(mean(.x, na.rm=TRUE),digits =2),
+                             sd=~round(sd(.x),digits = 3), 
+                             se = ~round(sem(.x), digits = 3)))) %>%
+  rename("N"=leaf_residence_time_y_n, 
+         "Mean leaf \nresidence time" = leaf_residence_time_y_mean, 
+         "sd" = leaf_residence_time_y_sd,
+         "se" = leaf_residence_time_y_se)
+  
+  
+Table_lrt1 <- kbl(lrtfresh_mnse_trt, booktabs = T, caption = "**Supplementary Table S12 | Summary of leaf residence time using *fresh canopy leaves* SLA.** Mean leaf residence time (yr), standard deviation, and standard error for each of the 8 treatments in a mature forest in Central Amazonia. The data represents LRT estimates based on plot mean SLA for canopy fresh leaves.")
+kable_classic(Table_lrt1,lightable_options = "basic")
+
+```
+
+
+
+
+$~$
+
+
+##### 2.3.1.2 LRT estimates based on leaf litter based SLA.
+
+```{r Table_lrt2}
+lrtlitter_mnse_trt <- LRT %>%
+  dplyr::select(TRTNUM, TRT,leaf_residence_time_litter) %>%
+  mutate(TRT = fct_reorder(TRT,TRTNUM)) %>%
+  dplyr::group_by(TRT) %>%
+  summarise(across(leaf_residence_time_litter, 
+                   .f = list(n = ~length(.x),
+                             mean = ~round(mean(.x, na.rm=TRUE),digits =2),
+                             sd=~round(sd(.x),digits = 3), 
+                             se = ~round(sem(.x), digits = 3)))) %>%
+  rename("N"=leaf_residence_time_litter_n, 
+         "Mean leaf \nresidence time" = leaf_residence_time_litter_mean, 
+         "sd" = leaf_residence_time_litter_sd,
+         "se" = leaf_residence_time_litter_se)
+  
+  
+Table_lrt2 <- kbl(lrtlitter_mnse_trt, booktabs = T, caption = "**Supplementary Table S13 | Summary of leaf residence time using *leaf litter* SLA values.** Mean leaf residence time (yr), standard deviation, and standard error for each of the 8 treatments in a mature forest in Central Amazonia. The data represents LRT estimates based on plot mean SLA for litterfall leaves.")
+kable_classic(Table_lrt2,lightable_options = "basic")
+
+```
+
+
+$~$
+
+
+$~$
+
+#### 2.3.2 Leaf residence time model selection 
+
+
+$~$
+
+
+##### 2.3.2.1 LRT model selection for fresh leaf SLA based estimations.
+
+```{r lrt1mod, fig.height=12, warning=FALSE, tidy=TRUE}
+# Leaf residence time full model
+lrt1mod <- lmer(leaf_residence_time_y ~ N * P * CATIONS + (1|Block), 
+                data=LRT, na.action = na.fail)
+#anova(lrt1mod)
+#check_model(lrt1mod)
+
+# Litterfall productivity model simplification
+lrt1modsimp <- step(lrt1mod, reduce.random = FALSE) #from lmertest package, now keeps random factor in backward selection process
+#lrt1modsimp # all fixed effects removed from model, but P mod p-value = 0.0525
+lrt1modfinal <- get_model(lrt1modsimp)
+#check_model(litmodfinal)
+
+lrt_p_mod <- lmer(leaf_residence_time_y ~  P  + (1|Block), data=LRT, na.action = na.fail)
+#anova(lrt_p_mod)
+#check_model(lrt_p_mod)
+
+# LRT null model 
+lrt1mod_null <- lmer(leaf_residence_time_y ~ 1 + (1|Block), data=LRT, na.action = na.fail)
+lrt1nullcompare <- anova(lrt_p_mod,lrt1mod_null)
+
+
+Table_lrt1_modsimp <- kbl(lrt1modsimp$fixed, booktabs = T,caption = "**Supplementary Table S14 | Model simplification for leaf residence time based on *fresh canopy leaves* SLA.** Backward elimination model selection table. The final model suggests weak evidence for a P addition fixed effect.")
+kable_classic(Table_lrt1_modsimp,lightable_options = "basic")
+
+```
+
+
+```{r Table_lrt_P_mod}
+lrt_p_mod <- anova(lrt_p_mod)
+Table_lrt_p_mod <- kbl(lrt_p_mod, booktabs = T, caption = "**Supplementary Table S15 | Final model for leaf residence time based on *fresh canopy leaves* SLA.** Leaf residence time (SLA-fresh) final model shows a weakly significant effect of P addition as reported in Extended Data (Fig. 2A).")
+kable_classic(Table_lrt_p_mod,lightable_options = "basic")
+
+```
+$~$
+
+
+
+```{r Table_lrt1nullcompare}
+Table_lrt1nullcompare <- kbl(lrt1nullcompare, booktabs = T, caption = "**Supplementary Table S16 | Null model comparison for leaf residence time based on *fresh canopy leaves* SLA.** For completeness, we compare the final model with the null model. However, the model including P is a better fit for the data than the null model.")
+kable_classic(Table_lrt1nullcompare,lightable_options = "basic")
+
+```
+
+
+
+$~$
+
+
+
+
+$~$
+
+
+
+
+##### 2.3.2.2 LRT model selection for leaf litter based-SLA estimations.
+
+```{r lrt2mod, fig.height=12, warning=FALSE, tidy=TRUE}
+# Leaf residence time full model
+lrt2mod <- lmer(leaf_residence_time_litter ~ N * P * CATIONS + (1|Block), 
+                data=LRT, na.action = na.fail)
+#anova(lrt2mod)
+#check_model(lrt2mod)
+
+# Litterfall productivity model simplification
+lrt2modsimp <- step(lrt2mod, reduce.random = FALSE) #from lmertest package, now keeps random factor in backward selection process
+#lrt2modsimp # all fixed effects removed from model, but P mod p-value = 0.0525
+lrt2modfinal <- get_model(lrt2modsimp)
+#check_model(litmodfinal)
+
+# LRT null model 
+lrt2mod_null <- lmer(leaf_residence_time_litter ~ 1 + (1|Block), 
+                     data=LRT, na.action = na.fail)
+lrt2nullcompare <- anova(lrt2modfinal,lrt2mod_null)
+
+
+Table_lrt2_modsimp <- kbl(lrt2modsimp$fixed, booktabs = T,caption = "**Supplementary Table S17 | Model simplification for leaf residence time based on composite *leaf litter* SLA.** Backward elimination model selection table. The final model suggests strong evidence for a P addition fixed effect.")
+kable_classic(Table_lrt2_modsimp,lightable_options = "basic")
+
+```
+
+
+```{r Table_lrt2modfinal}
+lrt2modfinal <- anova(lrt2modfinal)
+Table_lrt2modfinal <- kbl(lrt2modfinal, booktabs = T, caption = "**Supplementary Table S18 | Final model for leaf residence time based on composite *leaf litter* SLA.** Leaf residence time (SLA-litter) final model shows a strong significant effect of P addition as reported in Extended Data (Fig. 2B).")
+kable_classic(Table_lrt2modfinal,lightable_options = "basic")
+
+```
+$~$
+
+
+
+```{r Table_lrt2nullcompare}
+Table_lrt2nullcompare <- kbl(lrt2nullcompare, booktabs = T, caption = "**Supplementary Table S19 | Null model comparison for leaf residence time based on composite *leaf litter* SLA.** For completeness, we compare the final model with the null model. However, the model including P is a better fit for the data than the null model.")
+kable_classic(Table_lrt2nullcompare,lightable_options = "basic")
+
+```
+
+
+
+
+\newpage
+
+$~$
+
+
+
+
+$~$
+
+## 3. Fine root productivity
+$~$
+
+### 3.1 Fine root productivity (0-30cm) 
+
+
+
+#### 3.1.1 Fine root productivity (0-30cm) summary table
+
+
+```{r Table S12, results='asis'}
+rootprd_mnse_trt <- NPP %>%
+  dplyr::select(TRTNUM, TRT,Fine_root_Productivity) %>%
+  mutate(TRT = fct_reorder(TRT,TRTNUM)) %>%
+  dplyr::group_by(TRT) %>%
+  summarise(across(Fine_root_Productivity, 
+                   .f = list(n = ~length(.x),
+                             mean = ~round(mean(.x, na.rm=TRUE),digits =2),
+                             sd=~round(sd(.x),digits = 3), 
+                             se = ~round(sem(.x), digits = 3)))) %>%
+  rename("N"=Fine_root_Productivity_n, "Mean fine \nroot" = Fine_root_Productivity_mean,
+         "sd" = Fine_root_Productivity_sd,
+         "se" = Fine_root_Productivity_se)
+  
+  
+TableS12 <- kbl(rootprd_mnse_trt, booktabs = T, caption = "**Supplementary Table S20 | Summary of fine root productivity.** Mean fine root productivity (Mg C ha^-1^ yr^-1^), standard deviation, and standard error for each of the eight treatments (n=4). The data are for the soil depth of 0- 30 cm across two years (2017 to 2019).")
+kable_classic(TableS12,lightable_options = "basic")
+
+```
+
+$~$
+
+####  3.1.2 Fine root productivity (0-30cm) model selection
+
+
+
+```{r totrootmod ,tidy=TRUE, warning = FALSE, fig.height=12, collapse=TRUE, message=FALSE}
+# Total fine root productivity full model
+totmod_roots <- lmer(Fine_root_Productivity ~ N * P * CATIONS + (1|Block), 
+                     data=NPP, na.action = na.fail)
+#anova(totmod_roots)
+totmod_rootscheck <- check_model(totmod_roots)
+
+# Total fine root productivity model selection
+totmod_rootssimp <- step(totmod_roots, reduce.random = FALSE) #from lmertest package, now keeps random factor in backward selection process
+ # only P remains in model
+
+# Final model for fine root productivity
+totmod_rootsfinal <- get_model(totmod_rootssimp)
+totmod_rootsfinalcheck <- check_model(totmod_rootsfinal)
+
+# Total fine root productivity full model
+totmod_rootsnull <- lmer(Fine_root_Productivity ~ 1 + (1|Block), 
+                         data=NPP, na.action = na.fail)
+rootnullcompare <- anova(totmod_rootsfinal, totmod_rootsnull)
+
+
+TableS13 <- kbl(totmod_rootssimp$fixed, booktabs = T, caption = "**Supplementary Table S21 | Model simplification for fine root productivity in the depth 0-30 cm.** Step-wise backward elimination determined that the best model fit includes the P addition effect.")
+kable_classic(TableS13,lightable_options = "basic")
+
+
+```
+
+
+$~$
+
+
+
+
+```{r Table S14}
+totmod_rootsfinal <- anova(totmod_rootsfinal)
+TableS14 <- kbl(totmod_rootsfinal, booktabs = T, caption = "**Supplementary Table S22 | Final model for fine root productivity in the depth 0-30 cm.**The final fine root productivity model includes P addition only, indicating there is a significant effect of P addition on the 0 - 30 cm fine root productivity.")
+kable_classic(TableS14,lightable_options = "basic")
+
+```
+
+$~$
+
+
+ 
+```{r Table S15}
+TableS15 <- kbl(rootnullcompare, booktabs = T, caption = "**Supplementary Table S23 | Null model comparison for fine root productivity in the depth 0-30 cm.** For completeness, we compare the final model with the null model, which significantly differ indicating the final model is a better fit than the null model.")
+kable_classic(TableS15,lightable_options = "basic")
+
+```
+
+
+
+$~$
+
+
+
+
+#### Separating total fine root productivity into the top 10 cm and 10 - 30 cm layers. 
+
+
+$~$
+
+
+###  3.2 Top 10 cm fine root productivity 
+
+$~$
+
+
+#### 3.2.1 Fine root productivity (0-10cm) summary table
+
+
+```{r Table sumroot10, results='asis'}
+rootprd10_mnse_trt <- NPP %>%
+  dplyr::select(TRTNUM, TRT,Fine_root_Productivity_0_10) %>%
+  mutate(TRT = fct_reorder(TRT,TRTNUM)) %>%
+  dplyr::group_by(TRT) %>%
+  summarise(across(Fine_root_Productivity_0_10, 
+                   .f = list(n = ~length(.x),
+                             mean = ~round(mean(.x, na.rm=TRUE),digits =2),
+                             sd=~round(sd(.x),digits = 3), 
+                             se = ~round(sem(.x), digits = 3)))) %>%
+  rename("N"=Fine_root_Productivity_0_10_n, 
+         "Mean fine \nroot" = Fine_root_Productivity_0_10_mean, 
+         "sd" = Fine_root_Productivity_0_10_sd,
+         "se" = Fine_root_Productivity_0_10_se)
+  
+  
+TableS_root10 <- kbl(rootprd10_mnse_trt, booktabs = T, caption = "**Supplementary Table S24 | Summary of fine root productivity (0-10cm).** Mean fine root productivity (Mg C ha^-1^ yr^-1^), standard deviation, and standard error for each of the eight treatments (n=4). The data are for the soil depth of 0- 10 cm across two years (2017 to 2019).")
+kable_classic(TableS_root10,lightable_options = "basic")
+
+```
+
+$~$
+
+##### 3.2.1 Top 10 cm fine root productivity model selection
+
+
+```{r 10rootmod ,tidy=TRUE, warning = FALSE, fig.height=12}
+# Fine root productivity for the 0 - 10 cm layer full model
+totmod_roots10 <- lmer(Fine_root_Productivity_0_10 ~ N * P * CATIONS + (1|Block), 
+                       data=NPP, na.action = na.fail)
+#anova(totmod_roots10)
+totmod_roots10_check <- check_model(totmod_roots10)
+
+# Fine root productivity for the 0 - 10 cm layer model simplification
+totmod_rootssimp10 <- step(totmod_roots10, reduce.random = FALSE) #from lmertest package, now keeps random factor in backward selection process
+
+# Fine root productivity for the 0 - 10 cm layer final model
+totmod_rootssimp10_final <- get_model(totmod_rootssimp10) # only P remains in model
+totmod_rootssimp10_finalcheck <- check_model(totmod_rootssimp10_final)
+
+
+# Run null model and compare with final model
+totmod_roots10_null <- lmer(Fine_root_Productivity_0_10 ~ 1 + (1|Block), 
+                            data=NPP, na.action = na.fail)
+totmod_roots10_nullcompare <- anova(totmod_rootssimp10_final,totmod_roots10_null)
+
+# model simplification table
+
+TableS15 <- kbl(totmod_rootssimp10$fixed, booktabs = T, caption = "**Supplementary Table S25 | Model simplification for top 10 cm fine root productivity.** Step-wise backward elimination determined that the best model fit includes the P addition effect for top 10cm root productivity.")
+kable_classic(TableS15,lightable_options = "basic")
+
+```
+
+
+$~$
+
+
+
+```{r Table S16}
+totmod_rootssimp10_final <- anova(totmod_rootssimp10_final)
+TableS16 <- kbl(totmod_rootssimp10_final, booktabs = T, caption = "**Supplementary Table S26 | Final model for top 10 cm fine root productivity.** The final fine root productivity model includes P addition only, indicating there a significant effect of P addition on the 0 - 10 cm fine root productivity.")
+kable_classic(TableS16,lightable_options = "basic")
+
+```
+
+$~$
+
+
+ 
+```{r Table S17}
+TableS17 <- kbl(totmod_roots10_nullcompare, booktabs = T, caption = "**Supplementary Table S27 | Null model comparison for top 10 cm fine root productivity.** For completeness, we compare the final model with the null model, which significantly differ indicating the final model is a better fit than the null model.")
+kable_classic(TableS17,lightable_options = "basic")
+
+```
+
+
+
+
+
+$~$
+
+
+
+$~$
+
+
+###  3.3 Fine root productivity (10-30cm) productivity 
+
+
+
+$~$
+
+
+####  3.3.1 Fine root productivity (10-30cm) productivity summary table
+
+
+```{r Table sumroot30, results='asis'}
+rootprd30_mnse_trt <- NPP %>%
+  dplyr::select(TRTNUM, TRT,Fine_root_Productivity_10_30) %>%
+  mutate(TRT = fct_reorder(TRT,TRTNUM)) %>%
+  dplyr::group_by(TRT) %>%
+  summarise(across(Fine_root_Productivity_10_30, 
+                   .f = list(n = ~length(.x),
+                             mean = ~round(mean(.x, na.rm=TRUE),digits =2),
+                             sd=~round(sd(.x),digits = 3), 
+                             se = ~round(sem(.x), digits = 3)))) %>%
+  rename("N"=Fine_root_Productivity_10_30_n, 
+         "Mean fine \nroot" = Fine_root_Productivity_10_30_mean, 
+         "sd" = Fine_root_Productivity_10_30_sd,
+         "se" = Fine_root_Productivity_10_30_se)
+  
+  
+TableS_root30 <- kbl(rootprd30_mnse_trt, booktabs = T, caption = "**Supplementary Table S28 | Summary of fine root productivity (10-30cm).** Mean fine root productivity (Mg C ha^-1^ yr^-1^), standard deviation, and standard error for each of the eight treatments (n=4). The data are for the soil depth of 10- 30 cm across two years (2017 to 2019).")
+kable_classic(TableS_root30,lightable_options = "basic")
+
+```
+
+
+
+$~$
+
+
+
+
+
+#### 3.3.2.1 Fine root productivity (10-30cm) model selection
+
+
+
+
+```{r 30rootmod ,tidy=TRUE, warning = FALSE, fig.height=12}
+# Fine root productivity for the 10 - 30 cm layer full model 
+totmod_roots30 <- lmer(Fine_root_Productivity_10_30 ~ N * P * CATIONS + (1|Block), 
+                       data=NPP, na.action = na.fail)
+#anova(totmod_roots30)
+totmod_roots30_check <- check_model(totmod_roots30)
+
+# Fine root productivity for the 10 - 30 cm layer model selection
+totmod_rootssimp30 <- step(totmod_roots30, reduce.random = FALSE) # all fixed factors dropped from model
+
+
+# Run null model and compare with full  model
+totmod_roots30_null <- lmer(Fine_root_Productivity_10_30 ~ 1 + (1|Block), 
+                            data=NPP, na.action = na.fail)
+totmod_roots30_nullcompare <- anova(totmod_roots30,totmod_roots30_null)
+
+# model simplification table
+
+TableS18 <- kbl(totmod_rootssimp30$fixed, booktabs = T,caption = "**Supplementary Table S29 | Model simplification for 10 - 30 cm fine root productivity.** Step-wise backward elimination determined all fixed effects are dropped from the model for 10 - 30 cm root productivity.")
+kable_classic(TableS18,lightable_options = "basic")
+
+```
+
+
+$~$
+
+
+
+```{r Table S19}
+TableS19 <- kbl(totmod_roots30_nullcompare, booktabs = T,caption = "**Supplementary Table S30 | Null model compaison for 10 - 30 cm fine root productivity.**For completeness, we compare the full model with the null model, which do not significantly differ indicating the elimination of the nutrient addition fixed effects does not significantly effect the model fit for the 10-30cm fine root productivity.")
+kable_classic(TableS19,lightable_options = "basic")
+
+```
+
+
+\newpage
+
+$~$
+
+
+$~$
+
+
+## 4. Wood productivity 
+
+###  4.1 Wood productivity summary table
+
+
+```{r Table S9, results='asis'}
+woodprd_mnse_trt <- NPP %>%
+  dplyr::select(TRTNUM, TRT,Wood_Productivity) %>%
+  mutate(TRT = fct_reorder(TRT,TRTNUM)) %>%
+  dplyr::group_by(TRT) %>%
+  summarise(across(Wood_Productivity, 
+                   .f = list(n = ~length(.x),
+                             mean = ~round(mean(.x, na.rm=TRUE),digits =2),
+                             sd=~round(sd(.x),digits = 3), 
+                             se = ~round(sem(.x), digits = 3)))) %>%
+  rename("N"=Wood_Productivity_n, "Mean wood \nproductivity" = Wood_Productivity_mean, 
+         "sd" = Wood_Productivity_sd,
+         "se" = Wood_Productivity_se)
+  
+  
+TableS9 <- kbl(woodprd_mnse_trt, booktabs = T, caption = "**Supplementary Table S31 | Summary of Wood productivity.** Mean wood productivity (Mg C ha^-1^ yr^-1^), standard deviation, and standard errors for each of the eight treatments (TRT). The analysis comprises data of trees > 10 cm DBH across two years (2017 to 2019).")
+kable_classic(TableS9,lightable_options = "basic")
+
+```
+$~$
+
+###  4.2 Wood productivity models
+
+
+
+```{r woodmod  ,tidy=TRUE, warning = FALSE, fig.height=12}
+# Wood productivity full model
+woodmod <- lmer(Wood_Productivity ~ N * P * CATIONS + (1|Block), 
+                data=NPP,  na.action = na.fail)
+#anova(woodmod)
+#check_model(woodmod)
+
+# Wood productivity model simplification
+woodmodsimp <- step(woodmod, reduce.random = FALSE) #from lmertest package, now keeps random factor in backward selection process
+woodfin <- get_model(woodmodsimp) # everything removed from model
+
+TableS10 <- kbl(woodmodsimp$fixed, booktabs = T, caption = "**Supplementary Table S32 | Model simplification for stem wood productivity.** There was no significant difference detected in any of the tested models, indicating there were no nutrient addition effects on stem wood productivity.")
+kable_classic(TableS10,lightable_options = "basic")
+
+
+# Wood productivity null model
+woodmod_null <- lmer(Wood_Productivity ~ 1 + (1|Block), data=NPP,  na.action = na.fail)
+woodmod_nullcompare <- anova(woodmod,woodmod_null)
+
+TableS11 <- kbl(woodmod_nullcompare, booktabs = T, caption = "**Supplementary Table S33 | Null model comparison for stem wood productivity.** For completeness, we compare the full model with the null model, which do not differ.$ ")
+kable_classic(TableS11,lightable_options = "basic")
+
+```
+
+$~$
+
+\newpage
+
+
