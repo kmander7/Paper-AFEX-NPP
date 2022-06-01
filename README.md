@@ -14,5 +14,5 @@ TOTAL.csv: Plot mean data for NPP and its components
 
 
 ## R scripts 
-Nature_SupplementaryMaterials_html_default.Rmd: Rmarkdown R file for compiling Supplementary Material 
+Nature_SupplementaryMaterials_html_default.Rmd: Rmarkdown R file for compiling Supplementary Material (https://github.com/kmander7/Paper-AFEX-NPP/blob/main/Nature_SupplementaryMaterials_html_default.html)[output]
 Nature_SupplementaryMaterials_html_flatly.Rmd: Rmarkdown R file for compiling Supplementary Material with floating TOC 
